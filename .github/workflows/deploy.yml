@@ -1,30 +1,30 @@
 name: Deploy
 
-# push na main → staging. Produção: Actions → Deploy → Run workflow → production.
+# Só manual: Actions → Deploy → Run workflow. Hoje a publicação é feita do computador
+# (npm run deploy:production) e o ambiente de staging ainda não existe. Para rodar por aqui,
+# cadastre os secrets CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID no repositório.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
         description: Ambiente
         type: choice
-        options: [staging, production]
-        default: staging
+        options: [production, staging]
+        default: production
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-${{ github.event.inputs.environment || 'staging' }}
+  group: deploy-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'staging' }}
+    environment: ${{ inputs.environment }}
     env:
-      TARGET: ${{ github.event.inputs.environment || 'staging' }}
+      TARGET: ${{ inputs.environment }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:

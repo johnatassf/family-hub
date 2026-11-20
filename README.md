@@ -102,6 +102,7 @@ O app instalado funciona só com internet; sem conexão aparece a página `/offl
 | `0004_planning` | `fin_bills`, `plan_entries`, `plan_settings`, `goals`, `goal_contributions`, `goal_items` (+ limite e fatura em `fin_accounts`) |
 | `0005_store` | `biz_businesses`, `biz_members`, `biz_products`, `biz_kit_items`, `biz_customers`, `biz_sales`, `biz_sale_items`, `biz_payments`, `biz_stock_moves`, `biz_payables` |
 | `0006_incremental_sync` | Coluna `fin_accounts.tx_synced_at` e índice das transações pendentes |
+| `0007_card_bill_month` | Cartões no mês da fatura (`plan_settings.card_month`, `fin_transactions.reference_month_manual`) e correção dos pagamentos de fatura que contavam como gasto |
 
 Toda tabela de dados tem `household_id` (ou `business_id` na loja) e toda consulta passa pela regra de acesso do módulo.
 
@@ -137,7 +138,7 @@ Ordem dos provedores de e-mail: binding `EMAIL` (Cloudflare) → Resend → Brev
 
 - **Monorepo** com npm workspaces: `apps/platform` (o Worker) e `packages/*` (módulos). TypeScript em tudo.
 - **Build atual:** 1,86 MB (409 KB com gzip); o Worker inicia em 32 ms.
-- **CI/CD** (GitHub Actions, inativo até subir para o GitHub): `ci.yml` roda typecheck, testes e build em todo PR e push na `main`; `deploy.yml` aplica as migrations e publica em staging a cada push na `main` e em produção pelo botão *Run workflow*. Precisa dos *secrets* `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`.
+- **CI/CD** (GitHub Actions; repositório público, então os minutos são grátis): `ci.yml` roda typecheck, testes e build em todo PR e push na `main`. `deploy.yml` é só manual (*Run workflow*): aplica as migrations e publica no ambiente escolhido, e precisa dos *secrets* `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`. Hoje a publicação é feita do computador com `npm run deploy:production`.
 - **Testes:** Vitest no runtime do Workers cobrindo login, regras de acesso, sincronização (contra uma Pluggy falsa), paridade com o Python, planejamento, loja e envio de e-mail.
 
 ## Pontos de atenção e oportunidades de melhoria
@@ -163,7 +164,7 @@ Ordem dos provedores de e-mail: binding `EMAIL` (Cloudflare) → Resend → Brev
 - Uso da Pluggy por várias pessoas depende de contrato (o Meu Pluggy é pessoal).
 
 **Operação**
-- Sem ambiente de staging e sem CI rodando (falta o repositório no GitHub).
+- Sem ambiente de staging; o deploy pelo GitHub é manual e ainda não tem os *secrets* da Cloudflare.
 - Backup: só o histórico de restauração do próprio D1 (*Time Travel*); não há exportação agendada.
 - Sem alerta de erro: os logs existem, mas ninguém é avisado quando algo falha.
 
@@ -179,7 +180,7 @@ Ordem dos provedores de e-mail: binding `EMAIL` (Cloudflare) → Resend → Brev
 
 ```
 apps/platform/            o único Worker: API (src/worker) + React (src/web)
-  migrations/             SQL do D1 (0001 a 0006, ver "Banco de dados")
+  migrations/             SQL do D1 (0001 a 0007, ver "Banco de dados")
   test/                   testes (login, acesso, sincronização, paridade com o Python, loja, e-mail)
   wrangler.jsonc          bindings: dev local, staging e produção
 packages/core/            login, famílias, convites, papéis, auditoria, rate limit, headers, e-mail
