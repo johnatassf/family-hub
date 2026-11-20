@@ -29,6 +29,7 @@ const settingsSchema = z
   .object({
     commitLimitPct: z.number().int().min(5).max(100).optional(),
     variableOverrideCents: z.number().int().min(0).max(1_000_000_000_00).nullable().optional(),
+    cardMonth: z.enum(['bill', 'purchase']).optional(),
   })
   .strict();
 

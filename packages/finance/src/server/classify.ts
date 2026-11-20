@@ -14,14 +14,23 @@ export const DEFAULT_RULES: ReadonlyArray<readonly [pattern: string, category: s
   ['IFD*', 'Alimentação'], ['MCDONALD', 'Alimentação'], ['PIZZARIA', 'Alimentação'],
 ];
 
-/** Pagamento de fatura e afins: transferência excluída do total (evita contar o gasto duas vezes). */
-const TRANSFER_EXCLUDED = ['PAGAMENTO DE FATURA', 'PAGAMENTO ON LINE', 'EST DEB AUTOM', 'RESGATE PONTOS'];
+/**
+ * Pagamento de fatura e afins: transferência excluída do total (evita contar o gasto duas vezes).
+ * "FATURA CART" e "PAGAMENTO FAT" = o débito na conta corrente do Inter ("Pagamento efetuado - Fatura cartão").
+ * A migration 0007 aplica as mesmas regras aos lançamentos já gravados.
+ */
+const TRANSFER_EXCLUDED = ['PAGAMENTO DE FATURA', 'PAGAMENTO ON LINE', 'EST DEB AUTOM', 'RESGATE PONTOS', 'FATURA CART', 'PAGAMENTO FAT'];
 /**
  * Pagamento da fatura visto do lado do CARTÃO ("Pagamento recebido"). O Python não excluía e contava
  * a fatura duas vezes. Usa o operationType da Pluggy, e não o texto: "pagamento recebido" na conta
  * corrente pode ser uma receita de verdade.
  */
 const BILL_PAYMENT_OPERATIONS = new Set(['PAGAMENTO_FATURA']);
+/**
+ * Nem todo banco manda o operationType: no cartão, um crédito com "pagto"/"pagamento" também é o
+ * pagamento da fatura (ex.: "pagto debito automatico" do Inter). Estornos e créditos de loja continuam contando.
+ */
+const CARD_PAYMENT_TEXT = /PAG(TO|AMENTO)/;
 const TRANSFER_REVIEW = ['PIX ENVIADO', 'TRANSFERENCIA ENTRE CONTAS'];
 
 /** Igual ao Python: NFKD, remove marcas combinantes (acentos), maiúsculas, sem espaços nas pontas. */
@@ -38,9 +47,11 @@ export function classify(
   description: string,
   rules: ReadonlyArray<{ pattern: string; category: string }>,
   operationType?: string | null,
+  tx: { accountType?: string | null; amountCents?: number } = {},
 ): Classification {
   const d = norm(description);
-  if ((operationType && BILL_PAYMENT_OPERATIONS.has(operationType)) || TRANSFER_EXCLUDED.some((x) => d.includes(x))) {
+  const cardPayment = tx.accountType === 'CREDIT' && (tx.amountCents ?? 0) > 0 && CARD_PAYMENT_TEXT.test(d);
+  if (cardPayment || (operationType && BILL_PAYMENT_OPERATIONS.has(operationType)) || TRANSFER_EXCLUDED.some((x) => d.includes(x))) {
     return { category: 'Transferências', excluded: 1, confidence: 'Alta' };
   }
   if (TRANSFER_REVIEW.some((x) => d.includes(x))) return { category: 'Transferências', excluded: 0, confidence: 'Baixa' };
@@ -92,7 +103,11 @@ export function signedCents(tx: Pick<PluggyTransaction, 'amount' | 'type'>): num
   return cents;
 }
 
-export function toRow(tx: PluggyTransaction, rules: ReadonlyArray<{ pattern: string; category: string }>): TxRow | null {
+export function toRow(
+  tx: PluggyTransaction,
+  rules: ReadonlyArray<{ pattern: string; category: string }>,
+  accountType?: string | null,
+): TxRow | null {
   const id = String(tx.id ?? '');
   if (!id) return null;
   const date = (tx.date || tx.createdAt || '').slice(0, 10);
@@ -100,14 +115,15 @@ export function toRow(tx: PluggyTransaction, rules: ReadonlyArray<{ pattern: str
   const description = tx.description || tx.merchant?.name || '(Sem descrição)';
   const cc = tx.creditCardMetadata ?? {};
   const digits = (cc.cardNumber ?? '').replace(/\D/g, '');
+  const amountCents = signedCents(tx);
   return {
     id,
     description,
-    amountCents: signedCents(tx),
+    amountCents,
     date,
-    // A API nem sempre informa a competência da fatura: o mês da compra é o fallback (editável).
+    // Mês da compra na gravação; nos cartões, applyReferenceMonths troca pelo mês da fatura logo depois.
     referenceMonth: date.slice(0, 7),
-    ...classify(description, rules, tx.operationType),
+    ...classify(description, rules, tx.operationType, { accountType, amountCents }),
     installment: installmentOf(tx),
     status: tx.status ?? null,
     billId: cc.billId ?? null,

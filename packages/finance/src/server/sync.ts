@@ -1,5 +1,6 @@
 import { fail, nowIso } from '@familia/core';
 import { DEFAULT_CATEGORIES, type SyncResult } from '../shared';
+import { applyReferenceMonths, getCardMonth, reconcileBillPayments } from './adjust';
 import { DEFAULT_RULES, type TxRow, toRow } from './classify';
 import { PluggyError, type PluggyClient, type PluggyTransaction } from './pluggy';
 
@@ -201,7 +202,7 @@ export async function syncItem(
       }
       const seen = new Set<string>();
       const save = async (txs: PluggyTransaction[]) => {
-        const rows = txs.map((t) => toRow(t, rules)).filter((r): r is TxRow => r !== null);
+        const rows = txs.map((t) => toRow(t, rules, account.type)).filter((r): r is TxRow => r !== null);
         for (let i = 0; i < rows.length; i += CHUNK) {
           const chunk = rows.slice(i, i + CHUNK);
           await db.prepare(UPSERT_TRANSACTIONS).bind(JSON.stringify(chunk), account.id, item.household_id, account.type ?? null, nowIso()).run();
@@ -227,6 +228,13 @@ export async function syncItem(
       // Só avança depois de buscar tudo da conta: se falhar no meio, a próxima rodada recomeça do ponto anterior.
       await db.prepare(`UPDATE fin_accounts SET tx_synced_at = ? WHERE id = ? AND item_id = ?`).bind(started, account.id, item.id).run();
     }
+
+    // Cartões no mês da fatura (ou da compra, conforme a família) e pagamento de fatura feito pela conta
+    // corrente com texto genérico. Em SQL no D1, sem custo de CPU no Worker.
+    if (accounts.length) {
+      await applyReferenceMonths(db, item.household_id, await getCardMonth(db, item.household_id), accounts.map((a) => a.id));
+    }
+    await reconcileBillPayments(db, item.household_id);
 
     const finished = nowIso();
     await db.batch([

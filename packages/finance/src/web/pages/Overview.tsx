@@ -1,11 +1,46 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
-import { Card, Loading, Notice, PageHeader, Select, StatTile, errorMessage, formatMonth } from '@familia/ui';
-import { formatBRL } from '../../shared';
+import { isManager } from '@familia/shared';
+import { Card, Loading, Notice, PageHeader, Segmented, Select, StatTile, errorMessage, formatMonth, useSession } from '@familia/ui';
+import { type CardMonth, formatBRL } from '../../shared';
 import { financeApi } from '../api';
 import { BarList, MonthlyChart, ScopeBar, TxTable, useScope } from '../components';
 
 const currentMonth = () => new Date().toISOString().slice(0, 7);
+
+/**
+ * Em que mês contam os cartões. Mês da fatura = igual ao app do banco (parcelas futuras no mês em que serão pagas).
+ * Vale para a família toda, então só dono(a) ou administrador(a) troca; os demais veem qual está em uso.
+ */
+function CardMonthSetting() {
+  const { household } = useSession();
+  const qc = useQueryClient();
+  const settings = useQuery({ queryKey: ['finance', 'plan', 'settings'], queryFn: financeApi.settings });
+  const save = useMutation({
+    mutationFn: (cardMonth: CardMonth) => financeApi.updateSettings({ cardMonth }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['finance'] }),
+  });
+  if (!settings.data) return null;
+  const mode = (save.isPending && save.variables) || settings.data.cardMonth;
+  if (!isManager(household.role)) {
+    return <span className="text-xs text-muted">Cartões contam no mês {mode === 'bill' ? 'da fatura' : 'da compra'}</span>;
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-muted">Cartões contam no mês</span>
+      <Segmented<CardMonth>
+        label="Cartões contam no mês"
+        value={mode}
+        onChange={(v) => v !== mode && save.mutate(v)}
+        options={[
+          { value: 'bill', label: 'da fatura' },
+          { value: 'purchase', label: 'da compra' },
+        ]}
+      />
+      {save.isError && <span className="text-xs text-danger">{errorMessage(save.error)}</span>}
+    </div>
+  );
+}
 
 export function Overview() {
   const { query, params, set } = useScope();
@@ -38,7 +73,7 @@ export function Overview() {
         <Loading />
       ) : (
         <>
-          <div className="mb-4 flex items-center gap-3">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
             <Select aria-label="Mês" value={selected} onChange={(e) => set('mes', e.target.value)}>
               {[...months].reverse().map((x) => (
                 <option key={x.month} value={x.month}>
@@ -47,7 +82,7 @@ export function Overview() {
               ))}
               {!months.length && <option value={selected}>{formatMonth(selected)}</option>}
             </Select>
-            <span className="text-xs text-muted">Mês de referência (fatura/competência)</span>
+            <CardMonthSetting />
           </div>
           <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
             <StatTile label="Despesas no mês" value={formatBRL(m?.expensesCents ?? 0)} sub="Sem pagamentos de fatura" />

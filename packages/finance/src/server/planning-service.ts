@@ -18,6 +18,7 @@ import {
 } from '../planning';
 import type { FinBill, InstallmentsResponse, PlanEntry, PlanScope, PlanSettings, ProjectionResponse, Visibility } from '../shared';
 import { type TxFilters, txWhere, visibleAccounts } from './access';
+import { applyReferenceMonths } from './adjust';
 
 /**
  * Contas que entram no planejamento. Subconjunto da regra de visibilidade:
@@ -214,10 +215,14 @@ export async function deleteEntry(db: D1Database, ctx: RequestCtx, id: string) {
 
 export async function getSettings(db: D1Database, householdId: string): Promise<PlanSettings> {
   const row = await db
-    .prepare(`SELECT commit_limit_pct, variable_override_cents FROM plan_settings WHERE household_id = ?`)
+    .prepare(`SELECT commit_limit_pct, variable_override_cents, card_month FROM plan_settings WHERE household_id = ?`)
     .bind(householdId)
-    .first<{ commit_limit_pct: number; variable_override_cents: number | null }>();
-  return { commitLimitPct: row?.commit_limit_pct ?? 30, variableOverrideCents: row?.variable_override_cents ?? null };
+    .first<{ commit_limit_pct: number; variable_override_cents: number | null; card_month: PlanSettings['cardMonth'] }>();
+  return {
+    commitLimitPct: row?.commit_limit_pct ?? 30,
+    variableOverrideCents: row?.variable_override_cents ?? null,
+    cardMonth: row?.card_month ?? 'bill',
+  };
 }
 
 export async function updateSettings(db: D1Database, ctx: RequestCtx, patch: Partial<PlanSettings>) {
@@ -226,12 +231,14 @@ export async function updateSettings(db: D1Database, ctx: RequestCtx, patch: Par
   const next = { ...cur, ...patch };
   await db
     .prepare(
-      `INSERT INTO plan_settings (household_id, commit_limit_pct, variable_override_cents, updated_at) VALUES (?, ?, ?, ?)
+      `INSERT INTO plan_settings (household_id, commit_limit_pct, variable_override_cents, card_month, updated_at) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(household_id) DO UPDATE SET commit_limit_pct = excluded.commit_limit_pct,
-         variable_override_cents = excluded.variable_override_cents, updated_at = excluded.updated_at`,
+         variable_override_cents = excluded.variable_override_cents, card_month = excluded.card_month, updated_at = excluded.updated_at`,
     )
-    .bind(ctx.householdId, next.commitLimitPct, next.variableOverrideCents, nowIso())
+    .bind(ctx.householdId, next.commitLimitPct, next.variableOverrideCents, next.cardMonth, nowIso())
     .run();
+  // Vale para a família toda: recalcula o mês de todos os lançamentos de cartão (menos os editados à mão).
+  if (next.cardMonth !== cur.cardMonth) await applyReferenceMonths(db, ctx.householdId, next.cardMonth);
 }
 
 // ---------- Projeção ----------

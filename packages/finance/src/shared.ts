@@ -146,9 +146,13 @@ export interface PlanEntry {
   visibility: Visibility;
 }
 
+/** Em que mês contam os lançamentos de cartão: no da fatura (como o app do banco) ou no da compra. */
+export type CardMonth = 'bill' | 'purchase';
+
 export interface PlanSettings {
   commitLimitPct: number;
   variableOverrideCents: number | null;
+  cardMonth: CardMonth;
 }
 
 export interface ProjectionResponse {

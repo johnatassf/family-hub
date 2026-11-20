@@ -152,7 +152,8 @@ export async function editTransaction(db: D1Database, ctx: RequestCtx, txId: str
     params.push(patch.category);
   }
   if (patch.referenceMonth !== undefined) {
-    sets.push('reference_month = ?');
+    // Marcado como manual: não muda quando a família troca entre mês da fatura e mês da compra.
+    sets.push('reference_month = ?', 'reference_month_manual = 1');
     params.push(patch.referenceMonth);
   }
   if (patch.excluded !== undefined) {

@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AppError, type RequestCtx } from '@familia/core';
-import { createPluggyClient, financeService, syncItem } from '@familia/finance/server';
+import { createPluggyClient, financeService, planningService, syncItem } from '@familia/finance/server';
 import parity from './fixtures/python-parity.json';
 import { DEFAULT_RULES, classify, installmentOf, signedCents } from '@familia/finance/server';
 
@@ -151,7 +151,9 @@ describe('sincronização Pluggy', () => {
     const { client, calls } = fakePluggy();
     await syncItem(env.DB, client, item, 'manual');
     await env.DB.batch([
-      env.DB.prepare(`UPDATE fin_transactions SET category = 'Lazer', reference_month = '2026-11', excluded = 1, confidence = 'Manual', assigned_user_id = 'u1' WHERE id = 'k2'`),
+      env.DB.prepare(
+        `UPDATE fin_transactions SET category = 'Lazer', reference_month = '2026-11', reference_month_manual = 1, excluded = 1, confidence = 'Manual', assigned_user_id = 'u1' WHERE id = 'k2'`,
+      ),
       env.DB.prepare(`UPDATE fin_accounts SET visibility = 'family', nickname = 'Cartão da casa' WHERE id = 'acc-card'`),
     ]);
     await unlock();
@@ -201,6 +203,61 @@ describe('sincronização Pluggy', () => {
     expect(await env.DB.prepare(`SELECT status FROM fin_transactions WHERE id = 'k4'`).first()).toEqual({ status: 'POSTED' });
     const after = await env.DB.prepare(`SELECT tx_synced_at FROM fin_accounts WHERE id = 'acc-card'`).first<{ tx_synced_at: string }>();
     expect(after!.tx_synced_at > since).toBe(true);
+  });
+
+  it('cartões no mês da fatura e pagamentos de fatura fora do total, mesmo sem operationType', async () => {
+    await syncItem(env.DB, fakePluggy().client, item, 'manual');
+    await env.DB.prepare(`UPDATE fin_accounts SET tx_synced_at = ?`).bind('2026-11-10T15:30:45.123Z').run();
+    await unlock();
+    const { client } = fakePluggy({
+      created: {
+        'acc-card': [
+          // Entrou na fatura que vence 12/11: conta em novembro, não no mês da compra.
+          tx('k6', { description: 'FARMACIA', date: '2026-10-20T03:00:00.000Z', creditCardMetadata: { billId: 'bill-1' } }),
+          // Parcela futura: vem com a data da compra (julho) e a fatura prevista (janeiro).
+          tx('k7', { description: 'AGNALDO', status: 'PENDING', date: '2026-07-08T03:00:00.000Z', creditCardMetadata: { billForecastDate: '2027-01' } }),
+          // Pagamento da fatura por débito automático, sem operationType (Inter).
+          tx('k8', { description: 'pagto debito automatico', amount: -300, type: 'CREDIT', date: '2026-11-10T03:00:00.000Z' }),
+          // Estorno continua abatendo o gasto.
+          tx('k9', { description: 'Estorno de Uber', amount: -5, type: 'CREDIT' }),
+        ],
+        'acc-cc': [
+          // Débito da fatura na conta corrente do Inter.
+          tx('c3', { description: 'Pagamento efetuado - Fatura cartão', amount: -300, date: '2026-11-10T03:00:00.000Z' }),
+          // Texto genérico: só sai do total porque o mesmo valor entrou como pagamento no cartão em até 3 dias.
+          tx('c4', { description: 'Pagamento efetuado|BANCO X SA', amount: -300, date: '2026-11-12T03:00:00.000Z' }),
+          tx('c5', { description: 'Pagamento efetuado|ESCOLA', amount: -450, date: '2026-11-11T03:00:00.000Z' }),
+        ],
+      },
+    });
+    await syncItem(env.DB, client, item, 'manual');
+    const row = (id: string) =>
+      env.DB.prepare(`SELECT reference_month AS month, excluded, category FROM fin_transactions WHERE id = ?`).bind(id).first();
+    expect(await row('k6')).toEqual({ month: '2026-11', excluded: 0, category: 'Saúde/Farmácia' });
+    expect(await row('k7')).toMatchObject({ month: '2027-01', excluded: 0 });
+    expect(await row('k8')).toEqual({ month: '2026-11', excluded: 1, category: 'Transferências' });
+    expect(await row('k9')).toMatchObject({ excluded: 0, category: 'Transporte' });
+    expect(await row('c3')).toMatchObject({ excluded: 1, category: 'Transferências' });
+    expect(await row('c4')).toMatchObject({ excluded: 1, category: 'Transferências' });
+    expect(await row('c5')).toMatchObject({ excluded: 0, category: 'Outros' });
+
+    // A família troca para o mês da compra: tudo volta, menos o mês editado à mão. A próxima sincronização respeita.
+    const ctx: RequestCtx = { userId: 'u1', householdId: 'hh_1', role: 'owner' };
+    await financeService.editTransaction(env.DB, ctx, 'k1', { referenceMonth: '2026-12' });
+    await planningService.updateSettings(env.DB, ctx, { cardMonth: 'purchase' });
+    expect(await row('k6')).toMatchObject({ month: '2026-10' });
+    expect(await row('k7')).toMatchObject({ month: '2026-07' });
+    expect(await row('k1')).toMatchObject({ month: '2026-12' });
+    await unlock();
+    await syncItem(env.DB, fakePluggy().client, item, 'manual');
+    expect(await row('k6')).toMatchObject({ month: '2026-10' });
+
+    await planningService.updateSettings(env.DB, ctx, { cardMonth: 'bill' });
+    expect(await row('k6')).toMatchObject({ month: '2026-11' });
+    expect(await row('k1')).toMatchObject({ month: '2026-12' });
+    expect(await planningService.getSettings(env.DB, 'hh_1')).toMatchObject({ cardMonth: 'bill' });
+    // Só dono(a) ou administrador(a) troca a regra da família.
+    await expect(planningService.updateSettings(env.DB, { ...ctx, role: 'member' }, { cardMonth: 'purchase' })).rejects.toMatchObject({ status: 403 });
   });
 
   it('conta que aparece depois na conexão busca o histórico inteiro só dela', async () => {
@@ -282,6 +339,22 @@ describe('sinal dos valores (DEBIT = saída, CREDIT = entrada)', () => {
     ['sem type: mantém o sinal da Pluggy', { amount: -10.005 }, -1001],
   ])('%s', (_name, tx, expected) => {
     expect(signedCents(tx)).toBe(expected);
+  });
+});
+
+describe('pagamento de fatura (sai do total para não contar o gasto duas vezes)', () => {
+  const rules = DEFAULT_RULES.map(([pattern, category]) => ({ pattern, category }));
+  it.each([
+    ['cartão: "pagto debito automatico" do Inter', 'pagto debito automatico', { accountType: 'CREDIT', amountCents: 816203 }, 1],
+    ['cartão: "PAGAMENTO ON LINE"', 'PAGAMENTO ON LINE', { accountType: 'CREDIT', amountCents: 524496 }, 1],
+    ['cartão: estorno continua contando', 'Estorno de Uber - NuPay', { accountType: 'CREDIT', amountCents: 219 }, 0],
+    ['cartão: compra numa loja com "pagamento" no nome', 'PAGAMENTO DIGITAL LTDA', { accountType: 'CREDIT', amountCents: -5000 }, 0],
+    ['conta: débito automático da luz continua sendo gasto', 'DEBITO AUTOMATICO ENEL', { accountType: 'BANK', amountCents: -20000 }, 0],
+    ['conta: fatura do cartão Inter', 'Pagamento efetuado - Fatura cartão', { accountType: 'BANK', amountCents: -936690 }, 1],
+    ['conta: fatura do cartão Inter (outro texto)', 'Pagamento efetuado - Pagamento Fatura Cartão Inter', { accountType: 'BANK', amountCents: -294636 }, 1],
+    ['conta: texto genérico só sai se casar com o cartão', 'Pagamento efetuado|BANCO INTER SA', { accountType: 'BANK', amountCents: -390652 }, 0],
+  ])('%s', (_name, desc, tx, excluded) => {
+    expect(classify(desc, rules, null, tx).excluded).toBe(excluded);
   });
 });
 

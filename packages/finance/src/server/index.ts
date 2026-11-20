@@ -8,6 +8,7 @@ export type { FinanceEnv } from './env';
 export { createPluggyClient, PluggyError, type PluggyClient } from './pluggy';
 export { classify, installmentOf, norm, signedCents, toRow, DEFAULT_RULES } from './classify';
 export { syncItem, syncDueItems, ensureFinanceDefaults } from './sync';
+export { applyReferenceMonths, getCardMonth, reconcileBillPayments } from './adjust';
 export { visibleAccounts, visibleAccountIds, txWhere } from './access';
 export * as financeService from './service';
 export * as planningService from './planning-service';
