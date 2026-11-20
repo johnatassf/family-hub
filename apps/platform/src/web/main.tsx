@@ -16,6 +16,23 @@ import './styles.css';
 
 setupPwa();
 
+// Depois de uma publicação nova, uma aba que ficou aberta ainda roda o build anterior e pede telas
+// (Metas, Boletos…) que não existem mais no servidor. Recarrega uma vez para pegar a versão nova.
+const RELOAD_KEY = 'familia:recarregou-apos-deploy';
+window.addEventListener('vite:preloadError', (event) => {
+  let last = 0;
+  try {
+    last = Number(sessionStorage.getItem(RELOAD_KEY)) || 0;
+  } catch {}
+  // Já recarregou há pouco e o erro voltou: é outro problema, deixa aparecer em vez de entrar em loop.
+  if (Date.now() - last < 10_000) return;
+  try {
+    sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+  } catch {}
+  event.preventDefault();
+  window.location.reload();
+});
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
