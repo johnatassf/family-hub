@@ -67,6 +67,7 @@
         "APP_URL": "https://familia-hub.hub-family.workers.dev",
         // Tem que ser o remetente verificado no Brevo (Remetentes, domínios e IPs).
         "EMAIL_FROM": "Família <SUBSTITUIR_REMETENTE_VERIFICADO_NO_BREVO>",
+        "DEV_EMAIL_OUTBOX": "false",
         "REQUIRE_ADMIN_2FA": "true",
         "ALLOW_OPEN_SIGNUP": "false",
         "FINANCE_MEMBERS_CAN_CONNECT": "false"
