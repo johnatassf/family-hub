@@ -1,0 +1,76 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "familia-hub",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // React (Vite) servido como Static Assets; só /api/* passa pelo Worker.
+  "assets": { "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"] },
+
+  // ---------- Desenvolvimento local (wrangler/vite dev). Nada aqui vai para produção. ----------
+  "d1_databases": [{ "binding": "DB", "database_name": "familia-hub-local", "database_id": "local", "migrations_dir": "migrations" }],
+  "kv_namespaces": [{ "binding": "KV", "id": "local" }],
+  "ratelimits": [
+    { "name": "RL_AUTH", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
+    { "name": "RL_API", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }
+  ],
+  "vars": {
+    "APP_NAME": "Família",
+    "APP_URL": "http://localhost:5173",
+    "EMAIL_FROM": "Família <nao-responda@localhost>",
+    "DEV_EMAIL_OUTBOX": "true",
+    "REQUIRE_ADMIN_2FA": "true",
+    "ALLOW_OPEN_SIGNUP": "false",
+    "FINANCE_MEMBERS_CAN_CONNECT": "false"
+  },
+  // Segredos locais ficam em .dev.vars (veja .dev.vars.example).
+
+  "env": {
+    // ---------- Staging (proteger com Cloudflare Access) ----------
+    "staging": {
+      "name": "familia-hub-staging",
+      "d1_databases": [{ "binding": "DB", "database_name": "familia-hub-staging", "database_id": "SUBSTITUIR_ID_D1_STAGING", "migrations_dir": "migrations" }],
+      "kv_namespaces": [{ "binding": "KV", "id": "SUBSTITUIR_ID_KV_STAGING" }],
+      "ratelimits": [
+        { "name": "RL_AUTH", "namespace_id": "2001", "simple": { "limit": 10, "period": 60 } },
+        { "name": "RL_API", "namespace_id": "2002", "simple": { "limit": 120, "period": 60 } }
+      ],
+      "send_email": [{ "name": "EMAIL" }],
+      "vars": {
+        "APP_NAME": "Família (staging)",
+        "APP_URL": "https://staging.SEU-DOMINIO.com.br",
+        "EMAIL_FROM": "Família <nao-responda@SEU-DOMINIO.com.br>",
+        "REQUIRE_ADMIN_2FA": "true",
+        "ALLOW_OPEN_SIGNUP": "false",
+        "FINANCE_MEMBERS_CAN_CONNECT": "false"
+      }
+    },
+    // ---------- Produção ----------
+    "production": {
+      "name": "familia-hub",
+      "d1_databases": [{ "binding": "DB", "database_name": "familia-hub", "database_id": "eec1f6f5-41fd-4013-9bb1-9ab6e4a18682", "migrations_dir": "migrations" }],
+      "kv_namespaces": [{ "binding": "KV", "id": "47f5e16aedbd4fc6bb8f96807cd78310" }],
+      "ratelimits": [
+        { "name": "RL_AUTH", "namespace_id": "3001", "simple": { "limit": 10, "period": 60 } },
+        { "name": "RL_API", "namespace_id": "3002", "simple": { "limit": 120, "period": 60 } }
+      ],
+      // E-mail pelo Brevo (segredo BREVO_API_KEY), que funciona sem domínio próprio.
+      // Com domínio na Cloudflare + Workers Paid, dá para voltar ao Email Service: "send_email": [{ "name": "EMAIL" }]
+      // (o binding EMAIL tem prioridade sobre o Brevo).
+      // 09:00 UTC = 06:00 em Brasília: sincronização diária das conexões.
+      "triggers": { "crons": ["0 9 * * *"] },
+      "vars": {
+        "APP_NAME": "Família",
+        // Endereço exato do app: o login e a checagem de CSRF comparam com ele.
+        "APP_URL": "https://familia-hub.hub-family.workers.dev",
+        // Tem que ser o remetente verificado no Brevo (Remetentes, domínios e IPs).
+        "EMAIL_FROM": "Família <SUBSTITUIR_REMETENTE_VERIFICADO_NO_BREVO>",
+        "REQUIRE_ADMIN_2FA": "true",
+        "ALLOW_OPEN_SIGNUP": "false",
+        "FINANCE_MEMBERS_CAN_CONNECT": "false"
+      }
+    }
+  }
+}

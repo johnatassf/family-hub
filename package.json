@@ -1,0 +1,19 @@
+{
+  "name": "familia-hub",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @familia/platform",
+    "build": "npm run build -w @familia/platform",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:migrate:local": "npm run db:migrate:local -w @familia/platform"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,40 @@
+@import 'tailwindcss';
+
+/* Pacotes do monorepo também usam classes do Tailwind. */
+@source '../../../../packages';
+
+/* Identidade herdada do app Flask: tema escuro com verde de destaque. */
+@theme {
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --color-page: #0b111a;
+  --color-side: #101923;
+  --color-card: #141f2b;
+  --color-card-2: #1b2a36;
+  --color-line: #263747;
+  --color-line-strong: #344253;
+  --color-ink: #e7eaf0;
+  --color-ink-2: #aab5c4;
+  --color-muted: #8d9aab;
+  --color-accent: #61d59b;
+  --color-accent-ink: #10251c;
+  --color-accent-soft: #213c36;
+  --color-positive: #78dda9;
+  --color-danger: #f5a9a9;
+  --color-warn: #fab219;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+input[type='month'],
+input[type='checkbox'] {
+  accent-color: var(--color-accent);
+}

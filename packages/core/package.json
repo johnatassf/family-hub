@@ -1,0 +1,16 @@
+{
+  "name": "@familia/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@familia/shared": "^0.0.0",
+    "better-auth": "^1.7.27",
+    "hono": "^4.13.19",
+    "zod": "^4.6.7"
+  }
+}

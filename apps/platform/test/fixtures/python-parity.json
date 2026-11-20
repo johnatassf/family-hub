@@ -1,0 +1,260 @@
+{
+ "classify": [
+  [
+   "PAGAMENTO DE FATURA",
+   "Transferências",
+   1,
+   "Alta"
+  ],
+  [
+   "Pagamento on line cartao",
+   "Transferências",
+   1,
+   "Alta"
+  ],
+  [
+   "EST DEB AUTOM SEGURO",
+   "Transferências",
+   1,
+   "Alta"
+  ],
+  [
+   "resgate pontos livelo",
+   "Transferências",
+   1,
+   "Alta"
+  ],
+  [
+   "PIX ENVIADO Maria",
+   "Transferências",
+   0,
+   "Baixa"
+  ],
+  [
+   "Transferência entre contas",
+   "Transferências",
+   0,
+   "Baixa"
+  ],
+  [
+   "Supermercado Dia",
+   "Mercado",
+   0,
+   "Alta"
+  ],
+  [
+   "EXTRA HIPER 123",
+   "Mercado",
+   0,
+   "Alta"
+  ],
+  [
+   "Mercado Livre*Compra",
+   "Mercado",
+   0,
+   "Alta"
+  ],
+  [
+   "UBER *TRIP",
+   "Transporte",
+   0,
+   "Alta"
+  ],
+  [
+   "99* POP",
+   "Transporte",
+   0,
+   "Alta"
+  ],
+  [
+   "Netflix.com",
+   "Assinaturas",
+   0,
+   "Alta"
+  ],
+  [
+   "SPOTIFY P1234",
+   "Assinaturas",
+   0,
+   "Alta"
+  ],
+  [
+   "OpenAI *ChatGPT",
+   "Assinaturas",
+   0,
+   "Alta"
+  ],
+  [
+   "CANVA* PRO",
+   "Assinaturas",
+   0,
+   "Alta"
+  ],
+  [
+   "gamma.app",
+   "Assinaturas",
+   0,
+   "Alta"
+  ],
+  [
+   "Wellhub",
+   "Saúde/Farmácia",
+   0,
+   "Alta"
+  ],
+  [
+   "Drogaria Farma Bem",
+   "Saúde/Farmácia",
+   0,
+   "Alta"
+  ],
+  [
+   "Hope Vet Clínica",
+   "Saúde/Farmácia",
+   0,
+   "Alta"
+  ],
+  [
+   "SHEIN.COM",
+   "Compras pessoais",
+   0,
+   "Alta"
+  ],
+  [
+   "iFood *Restaurante",
+   "Alimentação",
+   0,
+   "Alta"
+  ],
+  [
+   "IFD*BURGER",
+   "Alimentação",
+   0,
+   "Alta"
+  ],
+  [
+   "McDonald's Paulista",
+   "Alimentação",
+   0,
+   "Alta"
+  ],
+  [
+   "Pizzaria Bráz",
+   "Alimentação",
+   0,
+   "Alta"
+  ],
+  [
+   "Faculdade XYZ",
+   "Educação",
+   0,
+   "Alta"
+  ],
+  [
+   "FIAP Mensalidade",
+   "Educação",
+   0,
+   "Alta"
+  ],
+  [
+   "Loja Aleatória",
+   "Outros",
+   0,
+   "Baixa"
+  ],
+  [
+   "",
+   "Outros",
+   0,
+   "Baixa"
+  ],
+  [
+   "Café São João",
+   "Outros",
+   0,
+   "Baixa"
+  ],
+  [
+   "EMMASLEEP colchão",
+   "Casa",
+   0,
+   "Alta"
+  ],
+  [
+   "AGNALDO aluguel",
+   "Casa",
+   0,
+   "Alta"
+  ],
+  [
+   "Berzerm Store",
+   "Compras pessoais",
+   0,
+   "Alta"
+  ],
+  [
+   "TROCAFY",
+   "Compras pessoais",
+   0,
+   "Alta"
+  ],
+  [
+   "Gympass",
+   "Saúde/Farmácia",
+   0,
+   "Alta"
+  ],
+  [
+   "Farmácia Pague Menos",
+   "Saúde/Farmácia",
+   0,
+   "Alta"
+  ],
+  [
+   "  transferência ENTRE contas  ",
+   "Transferências",
+   0,
+   "Baixa"
+  ],
+  [
+   "Pão de Açúcar",
+   "Outros",
+   0,
+   "Baixa"
+  ]
+ ],
+ "installment": [
+  [
+   "LOJA X PARCELA 3 DE 10",
+   "Parcela 3/10"
+  ],
+  [
+   "Compra 02/06",
+   "Parcela 02/06"
+  ],
+  [
+   "Netflix 1/12",
+   "Parcela 1/12"
+  ],
+  [
+   "parcela 7/7 Magalu",
+   "Parcela 7/7"
+  ],
+  [
+   "sem parcela aqui",
+   ""
+  ],
+  [
+   "Assinatura 2026 de 12",
+   "Parcela 26/12"
+  ],
+  [
+   "12 de 2026",
+   "Parcela 12/20"
+  ],
+  [
+   "Parcela 10/12",
+   "Parcela 10/12"
+  ]
+ ]
+}

@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types", "node"]
+  },
+  "include": [
+    "src/worker",
+    "test",
+    "../../packages/core/src",
+    "../../packages/finance/src/server",
+    "../../packages/finance/src/shared.ts",
+    "../../packages/store/src/server",
+    "../../packages/store/src/shared.ts",
+    "../../packages/store/src/import.ts",
+    "../../packages/shared/src"
+  ]
+}

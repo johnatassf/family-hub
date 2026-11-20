@@ -1,0 +1,26 @@
+# Copie para .dev.vars (fica fora do git). Em staging/produção use: npx wrangler secret put NOME --env production
+
+# Gere com: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+BETTER_AUTH_SECRET=
+
+# Quem pode criar a primeira família sem convite (separados por vírgula)
+BOOTSTRAP_OWNER_EMAILS=voce@empresa.com.br
+
+# Pluggy (painel Pluggy > Aplicação). Nunca vão para o frontend.
+PLUGGY_CLIENT_ID=
+PLUGGY_CLIENT_SECRET=
+
+# Opcional: login com Google (Google Cloud > Credenciais > ID do cliente OAuth, tipo "Aplicativo da Web")
+# URI de redirecionamento: http://localhost:5173/api/auth/callback/google
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Opcional: testar o envio real de e-mail pelo Brevo no dev local (sem isto, o código aparece no terminal).
+# Brevo > SMTP e API > aba "Chaves de API" (começa com xkeysib-; NÃO é a chave SMTP).
+# DEV_EMAIL_OUTBOX=false
+# BREVO_API_KEY=
+# EMAIL_FROM=Família <remetente-verificado-no-brevo@exemplo.com>
+
+# Opcional: Turnstile. Chaves de teste da Cloudflare (sempre passam):
+# TURNSTILE_SITE_KEY=1x00000000000000000000AA
+# TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA

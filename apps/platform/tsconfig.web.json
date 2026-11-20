@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"]
+  },
+  "include": [
+    "src/web",
+    "../../packages/ui/src",
+    "../../packages/finance/src/web",
+    "../../packages/finance/src/shared.ts",
+    "../../packages/store/src/web",
+    "../../packages/store/src/shared.ts",
+    "../../packages/store/src/import.ts",
+    "../../packages/shared/src"
+  ]
+}
