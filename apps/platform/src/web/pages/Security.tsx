@@ -35,34 +35,59 @@ function TwoFactorCard() {
   const hasPassword = useHasPassword();
   const [password, setPassword] = useState('');
   const [setup, setSetup] = useState<{ totpURI: string; backupCodes: string[] } | null>(null);
+  const [emailSetup, setEmailSetup] = useState(false);
   const [code, setCode] = useState('');
   const [codes, setCodes] = useState<string[] | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ['me'] });
   const pwd = hasPassword.data ? { password } : {};
+  const method = me.twoFactorMethod;
 
+  // App autenticador: gera o QR code e só ativa depois de confirmar um código do app.
   const enable = useMutation({
     mutationFn: () => authCall<{ totpURI: string; backupCodes: string[] }>('/two-factor/enable', pwd),
-    onSuccess: (data) => (setSetup(data), setPassword('')),
+    onSuccess: (data) => (setSetup(data), setPassword(''), setEmailSetup(false)),
   });
   const verify = useMutation({
     mutationFn: () => authCall('/two-factor/verify-totp', { code: code.trim() }),
     onSuccess: () => (setCodes(setup?.backupCodes ?? null), setSetup(null), setCode(''), refresh()),
+  });
+  // Código por e-mail (sem celular): envia um código e ativa ao confirmar — prova que o e-mail chega.
+  const sendEmailCode = useMutation({
+    mutationFn: () => authCall('/two-factor/send-otp', {}),
+    onSuccess: () => (setEmailSetup(true), setCode('')),
+  });
+  const verifyEmailCode = useMutation({
+    mutationFn: () => authCall('/two-factor/verify-otp', { code: code.trim() }),
+    onSuccess: () => (setEmailSetup(false), setCode(''), refresh()),
   });
   const disable = useMutation({ mutationFn: () => authCall('/two-factor/disable', pwd), onSuccess: () => (setPassword(''), refresh()) });
   const regenerate = useMutation({
     mutationFn: () => authCall<{ backupCodes: string[] }>('/two-factor/generate-backup-codes', pwd),
     onSuccess: (d) => (setCodes(d.backupCodes), setPassword('')),
   });
-  const error = enable.error ?? verify.error ?? disable.error ?? regenerate.error;
+  const error = enable.error ?? verify.error ?? sendEmailCode.error ?? verifyEmailCode.error ?? disable.error ?? regenerate.error;
 
   const passwordField = hasPassword.data && (
     <Field label="Sua senha">
       <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
     </Field>
   );
+  const codeInput = (
+    <Input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" maxLength={6} required autoFocus className="w-40 text-center font-mono tracking-[0.3em]" />
+  );
+  const emailWarning = (
+    <p className="text-xs text-muted">
+      O código por e-mail é menos seguro que o app: quem tiver acesso ao seu e-mail também passa por essa etapa. Use se não tiver celular.
+    </p>
+  );
 
   return (
-    <Card title="Verificação em duas etapas" actions={me.user.twoFactorEnabled ? <Pill tone="accent">✓ Ativa</Pill> : <Pill tone="warn">Desativada</Pill>}>
+    <Card
+      title="Verificação em duas etapas"
+      actions={
+        me.user.twoFactorEnabled ? <Pill tone="accent">✓ Ativa · {method === 'email' ? 'e-mail' : 'app'}</Pill> : <Pill tone="warn">Desativada</Pill>
+      }
+    >
       {error && <Notice tone="error">{errorMessage(error)}</Notice>}
       {codes && (
         <Notice tone="success">
@@ -92,23 +117,60 @@ function TwoFactorCard() {
             <summary className="cursor-pointer">Não consegue escanear? Digite a chave</summary>
             <code className="mt-2 block break-all text-ink-2">{new URL(setup.totpURI).searchParams.get('secret')}</code>
           </details>
-          <Field label="2. Digite o código que aparece no app">
-            <Input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" maxLength={6} required autoFocus className="w-40 text-center font-mono tracking-[0.3em]" />
-          </Field>
+          <Field label="2. Digite o código que aparece no app">{codeInput}</Field>
           <div>
             <Button type="submit" loading={verify.isPending}>
               Ativar
             </Button>
           </div>
         </form>
+      ) : emailSetup ? (
+        <form
+          className="grid gap-4"
+          onSubmit={(e: FormEvent) => {
+            e.preventDefault();
+            verifyEmailCode.mutate();
+          }}
+        >
+          <p className="text-sm text-ink-2">
+            Enviamos um código de 6 dígitos para <strong>{me.user.email}</strong>. Ele vale por 10 minutos (olhe também o spam).
+          </p>
+          <Field label="Código recebido por e-mail">{codeInput}</Field>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" loading={verifyEmailCode.isPending}>
+              Ativar
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => sendEmailCode.mutate()} loading={sendEmailCode.isPending}>
+              Reenviar código
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => (setEmailSetup(false), setCode(''))}>
+              Cancelar
+            </Button>
+          </div>
+        </form>
       ) : me.user.twoFactorEnabled ? (
         <form className="grid gap-4" onSubmit={(e) => e.preventDefault()}>
-          <p className="text-sm text-muted">Ao entrar com senha, pedimos o código do app autenticador. O login só por código de e-mail fica bloqueado nesta conta.</p>
+          {method === 'email' ? (
+            <>
+              <p className="text-sm text-muted">
+                Ao entrar com senha, enviamos um código para <strong>{me.user.email}</strong>. O login só por código de e-mail fica bloqueado nesta conta.
+              </p>
+              {emailWarning}
+            </>
+          ) : (
+            <p className="text-sm text-muted">Ao entrar com senha, pedimos o código do app autenticador. O login só por código de e-mail fica bloqueado nesta conta.</p>
+          )}
           {passwordField}
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => regenerate.mutate()} loading={regenerate.isPending}>
-              Gerar novos códigos de backup
-            </Button>
+            {method === 'email' ? (
+              <Button variant="outline" onClick={() => enable.mutate()} loading={enable.isPending}>
+                Trocar para app autenticador
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => regenerate.mutate()} loading={regenerate.isPending}>
+                Gerar novos códigos de backup
+              </Button>
+            )}
             <Button variant="danger" onClick={() => disable.mutate()} loading={disable.isPending}>
               Desativar
             </Button>
@@ -122,13 +184,17 @@ function TwoFactorCard() {
             enable.mutate();
           }}
         >
-          <p className="text-sm text-muted">Protege a conta mesmo que alguém descubra sua senha ou acesse seu e-mail. Obrigatória para dono(a) e administradores.</p>
+          <p className="text-sm text-muted">Protege a conta mesmo que alguém descubra sua senha. Obrigatória para dono(a) e administradores.</p>
           {hasPassword.isLoading ? <Loading /> : passwordField}
-          <div>
+          <div className="flex flex-wrap gap-2">
             <Button type="submit" loading={enable.isPending}>
               Configurar app autenticador
             </Button>
+            <Button type="button" variant="outline" onClick={() => sendEmailCode.mutate()} loading={sendEmailCode.isPending}>
+              Não tenho celular: usar código por e-mail
+            </Button>
           </div>
+          {emailWarning}
         </form>
       )}
     </Card>

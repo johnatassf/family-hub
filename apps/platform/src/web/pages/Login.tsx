@@ -7,7 +7,14 @@ import { usePublicConfig } from '../lib/config';
 import { Turnstile } from '../lib/Turnstile';
 import { AuthShell, GoogleButton } from './AuthShell';
 
-type Step = 'form' | 'code' | 'totp' | 'verify-email';
+/** 'totp' = segunda etapa pelo app autenticador; 'email-2fa' = segunda etapa por código no e-mail. */
+type Step = 'form' | 'code' | 'totp' | 'email-2fa' | 'verify-email';
+
+interface SignInResponse {
+  twoFactorRedirect?: boolean;
+  /** O que a conta aceita na segunda etapa ('totp' só aparece se ela configurou o app). */
+  twoFactorMethods?: string[];
+}
 
 /** Só aceita caminhos internos como destino depois do login (evita redirecionamento aberto). */
 export const safeNext = (value: string | null) => (value && value.startsWith('/') && !value.startsWith('//') ? value : '/');
@@ -53,6 +60,21 @@ export function Login() {
   const sendCode = (type: 'sign-in' | 'email-verification') =>
     authCall('/email-otp/send-verification-otp', { email, type }, { captcha });
 
+  const sendTwoFactorEmail = () => authCall('/two-factor/send-otp', {});
+
+  /** Senha aceita e a conta tem 2FA: app autenticador se ela tiver; senão, código por e-mail. */
+  const startSecondFactor = async (res: SignInResponse) => {
+    setCode('');
+    setUseBackup(false);
+    if (res.twoFactorMethods?.includes('totp')) {
+      setStep('totp');
+      return;
+    }
+    await sendTwoFactorEmail();
+    setInfo(`Enviamos um código de verificação para ${email}.`);
+    setStep('email-2fa');
+  };
+
   const submitForm = (e: FormEvent) => {
     e.preventDefault();
     run(async () => {
@@ -63,9 +85,9 @@ export function Login() {
         return;
       }
       try {
-        const res = await authCall<{ twoFactorRedirect?: boolean }>('/sign-in/email', { email, password }, { captcha });
+        const res = await authCall<SignInResponse>('/sign-in/email', { email, password }, { captcha });
         if (res.twoFactorRedirect) {
-          setStep('totp');
+          await startSecondFactor(res);
           return;
         }
         await done();
@@ -88,12 +110,14 @@ export function Login() {
         await done();
       } else if (step === 'verify-email') {
         await authCall('/email-otp/verify-email', { email, otp: code });
-        const res = await authCall<{ twoFactorRedirect?: boolean }>('/sign-in/email', { email, password });
+        const res = await authCall<SignInResponse>('/sign-in/email', { email, password });
         if (res.twoFactorRedirect) {
-          setCode('');
-          setStep('totp');
+          await startSecondFactor(res);
           return;
         }
+        await done();
+      } else if (step === 'email-2fa') {
+        await authCall('/two-factor/verify-otp', { code: code.trim(), trustDevice });
         await done();
       } else {
         await authCall(useBackup ? '/two-factor/verify-backup-code' : '/two-factor/verify-totp', { code: code.trim(), trustDevice });
@@ -105,7 +129,8 @@ export function Login() {
   const needsCaptcha = Boolean(config.data?.turnstileSiteKey);
 
   if (step !== 'form') {
-    const title = step === 'totp' ? 'Verificação em duas etapas' : step === 'verify-email' ? 'Confirme seu e-mail' : 'Digite o código';
+    const twoFactorStep = step === 'totp' || step === 'email-2fa';
+    const title = twoFactorStep ? 'Verificação em duas etapas' : step === 'verify-email' ? 'Confirme seu e-mail' : 'Digite o código';
     return (
       <AuthShell
         title={title}
@@ -125,7 +150,7 @@ export function Login() {
               className="text-center font-mono text-lg tracking-[0.4em]"
             />
           </Field>
-          {step === 'totp' && (
+          {twoFactorStep && (
             <label className="flex items-center gap-2 text-xs text-ink-2">
               <input type="checkbox" checked={trustDevice} onChange={(e) => setTrustDevice(e.target.checked)} />
               Confiar neste dispositivo por 30 dias
@@ -141,6 +166,10 @@ export function Login() {
             {step === 'totp' ? (
               <button type="button" className="text-accent hover:underline" onClick={() => (setUseBackup((v) => !v), setCode(''))}>
                 {useBackup ? 'Usar o app autenticador' : 'Usar código de backup'}
+              </button>
+            ) : step === 'email-2fa' ? (
+              <button type="button" className="text-accent hover:underline" disabled={busy} onClick={() => run(() => sendTwoFactorEmail().then(() => setInfo(`Código reenviado para ${email}.`)))}>
+                Reenviar código
               </button>
             ) : (
               <button type="button" className="text-accent hover:underline" disabled={busy} onClick={() => run(() => sendCode(step === 'code' ? 'sign-in' : 'email-verification').then(() => setInfo('Código reenviado.')))}>
@@ -189,7 +218,7 @@ export function Login() {
         <Button type="submit" loading={busy} disabled={needsCaptcha && !captcha}>
           {mode === 'code' ? 'Enviar código' : 'Entrar'}
         </Button>
-        {mode === 'code' && <p className="text-xs text-muted">Contas com verificação em duas etapas entram com senha + app autenticador ou com o Google.</p>}
+        {mode === 'code' && <p className="text-xs text-muted">Contas com verificação em duas etapas entram com senha (e o código do app ou do e-mail) ou com o Google.</p>}
       </form>
     </AuthShell>
   );

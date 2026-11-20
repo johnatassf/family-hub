@@ -50,6 +50,10 @@
     // ---------- Produção ----------
     "production": {
       "name": "familia-hub",
+      // Endereço público: https://familia-hub.hub-family.workers.dev (sem domínio próprio).
+      "workers_dev": true,
+      // Sem URLs de prévia por versão: o login só funciona no APP_URL mesmo.
+      "preview_urls": false,
       "d1_databases": [{ "binding": "DB", "database_name": "familia-hub", "database_id": "eec1f6f5-41fd-4013-9bb1-9ab6e4a18682", "migrations_dir": "migrations" }],
       "kv_namespaces": [{ "binding": "KV", "id": "47f5e16aedbd4fc6bb8f96807cd78310" }],
       "ratelimits": [
@@ -66,7 +70,7 @@
         // Endereço exato do app: o login e a checagem de CSRF comparam com ele.
         "APP_URL": "https://familia-hub.hub-family.workers.dev",
         // Tem que ser o remetente verificado no Brevo (Remetentes, domínios e IPs).
-        "EMAIL_FROM": "Família <SUBSTITUIR_REMETENTE_VERIFICADO_NO_BREVO>",
+        "EMAIL_FROM": "Família <johnatas.sf@gmail.com>",
         "DEV_EMAIL_OUTBOX": "false",
         "REQUIRE_ADMIN_2FA": "true",
         "ALLOW_OPEN_SIGNUP": "false",

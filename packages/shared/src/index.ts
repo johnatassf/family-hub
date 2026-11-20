@@ -51,6 +51,8 @@ export interface Me {
   households: HouseholdSummary[];
   /** true quando o papel do usuário em alguma família exige 2FA e ele ainda não ativou. */
   twoFactorRequired: boolean;
+  /** Como a segunda etapa é feita: app autenticador, código por e-mail ou ainda não ativada. */
+  twoFactorMethod: 'totp' | 'email' | null;
 }
 
 export interface Member {

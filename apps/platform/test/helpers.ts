@@ -126,6 +126,15 @@ export async function enableTotp(s: Session): Promise<Session & { secret: string
   return { ...s, cookie, secret };
 }
 
+/** Ativa 2FA por código no e-mail (quem não tem celular) e devolve a sessão atualizada. */
+export async function enableEmail2fa(s: Session): Promise<Session> {
+  const send = await api('/api/auth/two-factor/send-otp', { method: 'POST', session: s, body: {} });
+  if (!send.ok) throw new Error(`2fa send-otp ${send.status}: ${await send.text()}`);
+  const verify = await api('/api/auth/two-factor/verify-otp', { method: 'POST', session: s, body: { code: await lastCode(s.email) } });
+  if (!verify.ok) throw new Error(`2fa verify-otp ${verify.status}: ${await verify.text()}`);
+  return { ...s, cookie: cookiesFrom(verify, s.cookie) };
+}
+
 /** Dono(a) bootstrap já com 2FA ativo. */
 export async function ownerWith2fa(email = 'dono@teste.local', name = 'Ana Dona') {
   return enableTotp(await signUp(email, name));

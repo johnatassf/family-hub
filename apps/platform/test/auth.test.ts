@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import { PASSWORD, api, cookiesFrom, enableTotp, invite, json, lastEmail, ownerWith2fa, signIn, signUp, totp } from './helpers';
+import { PASSWORD, api, cookiesFrom, enableEmail2fa, enableTotp, invite, json, lastCode, lastEmail, ownerWith2fa, signIn, signUp, totp } from './helpers';
 
 describe('cadastro fechado (só convite)', () => {
   it('recusa cadastro de e-mail sem convite (sem revelar isso na resposta)', async () => {
@@ -80,6 +80,63 @@ describe('2FA obrigatório para dono/admin', () => {
 
     const signIn = await api('/api/auth/sign-in/email-otp', { method: 'POST', body: { email: owner.email, otp: '123456' } });
     expect(signIn.status).toBe(403);
+  });
+});
+
+describe('2FA por código no e-mail (quem não tem celular)', () => {
+  it('ativa com um código enviado por e-mail e libera a família', async () => {
+    const owner = await signUp('dono@teste.local', 'Ana Dona');
+    expect((await json(await api('/api/me', { session: owner }))).twoFactorMethod).toBeNull();
+
+    const send = await api('/api/auth/two-factor/send-otp', { method: 'POST', session: owner, body: {} });
+    expect(send.status).toBe(200);
+    const mail = await lastEmail(owner.email);
+    expect(mail?.subject).toContain('código de verificação');
+    const code = mail!.text.match(/\b(\d{6})\b/)![1]!;
+
+    const wrong = await api('/api/auth/two-factor/verify-otp', { method: 'POST', session: owner, body: { code: code === '000000' ? '111111' : '000000' } });
+    expect(wrong.status).toBe(401);
+    const ok = await api('/api/auth/two-factor/verify-otp', { method: 'POST', session: owner, body: { code } });
+    expect(ok.status).toBe(200);
+    const cookie = cookiesFrom(ok, owner.cookie);
+
+    const me = await json(await api('/api/me', { session: cookie }));
+    expect(me).toMatchObject({ twoFactorRequired: false, twoFactorMethod: 'email' });
+    expect((await api('/api/household', { session: cookie })).status).toBe(200);
+  });
+
+  it('login com senha pede o código enviado por e-mail', async () => {
+    const owner = await enableEmail2fa(await signUp('dono@teste.local', 'Ana Dona'));
+    const first = await api('/api/auth/sign-in/email', { method: 'POST', body: { email: owner.email, password: PASSWORD } });
+    const body = await json(first);
+    expect(body.twoFactorRedirect).toBe(true);
+    expect(body.twoFactorMethods).toEqual(['otp']); // sem app configurado
+    const pending = cookiesFrom(first);
+    expect((await api('/api/me', { session: pending })).status).toBe(401);
+
+    expect((await api('/api/auth/two-factor/send-otp', { method: 'POST', session: pending, body: {} })).status).toBe(200);
+    const second = await api('/api/auth/two-factor/verify-otp', { method: 'POST', session: pending, body: { code: await lastCode(owner.email) } });
+    expect(second.status).toBe(200);
+    expect((await api('/api/me', { session: cookiesFrom(second, pending) })).status).toBe(200);
+  });
+
+  it('quem usa app autenticador não recebe a segunda etapa por e-mail', async () => {
+    const owner = await ownerWith2fa();
+    expect((await json(await api('/api/me', { session: owner }))).twoFactorMethod).toBe('totp');
+    const first = await api('/api/auth/sign-in/email', { method: 'POST', body: { email: owner.email, password: PASSWORD } });
+    expect((await json(first)).twoFactorMethods).toContain('totp');
+    const pending = cookiesFrom(first);
+
+    expect((await api('/api/auth/two-factor/send-otp', { method: 'POST', session: pending, body: {} })).status).toBe(200);
+    expect(await lastEmail(owner.email, 10)).toBeNull(); // nada enviado: continua exigindo o app
+    const guess = await api('/api/auth/two-factor/verify-otp', { method: 'POST', session: pending, body: { code: '123456' } });
+    expect(guess.status).toBe(401);
+  });
+
+  it('dá para trocar do e-mail para o app autenticador', async () => {
+    const owner = await enableEmail2fa(await signUp('dono@teste.local', 'Ana Dona'));
+    const withApp = await enableTotp(owner);
+    expect((await json(await api('/api/me', { session: withApp }))).twoFactorMethod).toBe('totp');
   });
 });
 

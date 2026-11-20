@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { usePublicConfig } from '../lib/config';
+import { InstallBanner } from '../lib/install';
 
 export function AuthShell({ title, subtitle, children, footer }: { title: string; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode }) {
   const config = usePublicConfig();
@@ -16,6 +17,7 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
           <div className="mt-6">{children}</div>
         </div>
         {footer && <div className="mt-5 text-center text-sm text-muted">{footer}</div>}
+        <InstallBanner className="mt-6" />
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { Navigate, createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { ApiError } from '@familia/ui';
 import { Layout } from './Layout';
+import { setupPwa } from './lib/install';
 import { webModules } from './modules';
 import { Family } from './pages/Family';
 import { ForgotPassword } from './pages/ForgotPassword';
@@ -12,6 +13,8 @@ import { Login } from './pages/Login';
 import { Security } from './pages/Security';
 import { Signup } from './pages/Signup';
 import './styles.css';
+
+setupPwa();
 
 const queryClient = new QueryClient({
   defaultOptions: {

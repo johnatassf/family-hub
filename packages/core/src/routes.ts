@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { type Me, type PublicConfig, isManager } from '@familia/shared';
+import { hasVerifiedTotp } from './auth';
 import { flag } from './env';
 import {
   changeRole,
@@ -43,7 +44,8 @@ export function coreRoutes() {
     });
     const twoFactorRequired =
       flag(c.env.REQUIRE_ADMIN_2FA, true) && !user.twoFactorEnabled && households.some((h) => isManager(h.role));
-    return c.json<Me>({ user, households, twoFactorRequired });
+    const twoFactorMethod = !user.twoFactorEnabled ? null : (await hasVerifiedTotp(c.env.DB, user.id)) ? 'totp' : 'email';
+    return c.json<Me>({ user, households, twoFactorRequired, twoFactorMethod });
   });
 
   const household = new Hono<AppEnv>();
